@@ -47,36 +47,40 @@ var characterHeight = 40
 
 func main() {
 	deploymentsClient, deployment := k8s.ConnectK8s()
-	bullets := BulletBuffer{}
+	bulletBuffer := BulletBuffer{}
+	swarm := AlienSwarm{}
 	player := Player{rl.Rectangle{float32(screenWidth) / 2, float32(screenHeight) - 50, float32(characterWidth), float32(characterHeight)}}
 
-	//aliens := []Alien{}
-	aliens := AlienSwarm{}
 	for i := range servers {
 		alien := Alien{rl.Rectangle{float32(i*2*characterWidth + 10), float32(characterHeight) * 2, float32(characterWidth), float32(characterHeight)}, true}
-		aliens.aliens = append(aliens.aliens, alien)
+		swarm.aliens = append(swarm.aliens, alien)
 	}
-	//serverBlock := AlienBounds{}
 	rl.InitWindow(int32(screenWidth), int32(screenHeight), "K8s_Invaders")
 	defer rl.CloseWindow()
 	rl.SetTargetFPS(20)
 	k8s.CreateDeployment(deploymentsClient, deployment)
 	go k8s.UpdateDeployment(deploymentsClient, int32(servers))
+	for !rl.IsKeyPressed(rl.KeySpace) {
+		rl.BeginDrawing()
+		rl.ClearBackground(rl.Black)
+		rl.DrawText("Press Space to Continue", 200, 10, 30, rl.White)
+		rl.EndDrawing()
+	}
 	for !rl.WindowShouldClose() && !gameOver {
-		checkinput(&player, &bullets)
-		checkPhysics(&bullets, deploymentsClient, &player, &aliens)
+		checkinput(&player, &bulletBuffer)
+		checkPhysics(&bulletBuffer, deploymentsClient, &player, &swarm)
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Black)
 		replicaText := fmt.Sprintf("Replicas: %d", servers)
 		rl.DrawText(replicaText, 10, 10, 20, rl.Red)
-		for i := range aliens.aliens {
-			if aliens.aliens[i].enabled {
-				rl.DrawRectangleRec(aliens.aliens[i].rect, rl.Red)
+		for i := range swarm.aliens {
+			if swarm.aliens[i].enabled {
+				rl.DrawRectangleRec(swarm.aliens[i].rect, rl.Red)
 			}
 		}
-		for i := range bullets.Bullets {
-			rl.DrawRectangleRec(bullets.Bullets[i].rect, rl.Blue)
+		for i := range bulletBuffer.Bullets {
+			rl.DrawRectangleRec(bulletBuffer.Bullets[i].rect, rl.Blue)
 		}
 		rl.DrawRectangleRec(player.rect, rl.White)
 		rl.EndDrawing()
@@ -84,7 +88,7 @@ func main() {
 	k8s.DeleteDeployment(deploymentsClient)
 }
 
-func checkinput(player *Player, bullets *BulletBuffer) {
+func checkinput(player *Player, bulletBuffer *BulletBuffer) {
 	if rl.IsKeyDown(rl.KeyD) {
 		if player.rect.X+float32(characterWidth) < float32(screenWidth-characterWidth) {
 			player.rect.X += playerSpeed
@@ -97,18 +101,18 @@ func checkinput(player *Player, bullets *BulletBuffer) {
 	}
 	if rl.IsKeyPressed(rl.KeySpace) {
 		bullet := Bullet{rl.Rectangle{player.rect.X + (float32(characterWidth) / 2), player.rect.Y, 10, 5}, true}
-		bullets.Bullets = append(bullets.Bullets, bullet)
+		bulletBuffer.Bullets = append(bulletBuffer.Bullets, bullet)
 	}
 }
 
-func checkPhysics(bullets *BulletBuffer, deploymentsClient v1.DeploymentInterface, player *Player, aliens *AlienSwarm) {
-	for i := range bullets.Bullets {
-		for y := range aliens.aliens {
-			if rl.CheckCollisionRecs(bullets.Bullets[i].rect, aliens.aliens[y].rect) {
-				fmt.Println(aliens.aliens[y])
-				if bullets.Bullets[i].enabled && aliens.aliens[y].enabled {
-					bullets.Bullets[i].enabled = false
-					aliens.aliens[y].enabled = false
+func checkPhysics(bulletBuffer *BulletBuffer, deploymentsClient v1.DeploymentInterface, player *Player, swarm *AlienSwarm) {
+	for i := range bulletBuffer.Bullets {
+		for y := range swarm.aliens {
+			if rl.CheckCollisionRecs(bulletBuffer.Bullets[i].rect, swarm.aliens[y].rect) {
+				fmt.Println(swarm.aliens[y])
+				if bulletBuffer.Bullets[i].enabled && swarm.aliens[y].enabled {
+					bulletBuffer.Bullets[i].enabled = false
+					swarm.aliens[y].enabled = false
 					servers--
 					go k8s.UpdateDeployment(deploymentsClient, int32(servers))
 					if servers == 0 {
@@ -117,38 +121,36 @@ func checkPhysics(bullets *BulletBuffer, deploymentsClient v1.DeploymentInterfac
 				}
 			}
 		}
-		bullets.Bullets[i].rect.Y -= float32(bulletSpeed)
+		bulletBuffer.Bullets[i].rect.Y -= float32(bulletSpeed)
 	}
-	for i := range aliens.aliens {
-		aliens.aliens[i].rect.X += float32(alienSpeedX)
-	}
-	for i := range aliens.aliens {
-		if aliens.aliens[i].enabled {
-			aliens.minLeft = int(aliens.aliens[i].rect.X)
-			break
-		}
-	}
-	for i := len(aliens.aliens) - 1; i >= 0; i-- {
-		if aliens.aliens[i].enabled {
-			aliens.maxRight = int(aliens.aliens[i].rect.X)
-			break
-		}
-	}
-	if aliens.minLeft < 0 {
-		alienSpeedX = int(math.Abs(float64(alienSpeedX)))
-		for i := range aliens.aliens {
-			aliens.aliens[i].rect.Y += float32(alienSpeedY)
-		}
-	}
-	if aliens.maxRight+characterWidth > screenWidth {
-		for i := range aliens.aliens {
-			aliens.aliens[i].rect.Y += float32(alienSpeedY)
-		}
-		alienSpeedX = int(math.Abs(float64(alienSpeedX))) * -1
-	}
-	for i := range aliens.aliens {
-		if rl.CheckCollisionRecs(player.rect, aliens.aliens[i].rect) {
+	for i := range swarm.aliens {
+		swarm.aliens[i].rect.X += float32(alienSpeedX)
+		if rl.CheckCollisionRecs(player.rect, swarm.aliens[i].rect) {
 			gameOver = true
 		}
+	}
+	for i := range swarm.aliens {
+		if swarm.aliens[i].enabled {
+			swarm.minLeft = int(swarm.aliens[i].rect.X)
+			break
+		}
+	}
+	for i := len(swarm.aliens) - 1; i >= 0; i-- {
+		if swarm.aliens[i].enabled {
+			swarm.maxRight = int(swarm.aliens[i].rect.X)
+			break
+		}
+	}
+	if swarm.minLeft < 0 {
+		alienSpeedX = int(math.Abs(float64(alienSpeedX)))
+		for i := range swarm.aliens {
+			swarm.aliens[i].rect.Y += float32(alienSpeedY)
+		}
+	}
+	if swarm.maxRight+characterWidth > screenWidth {
+		for i := range swarm.aliens {
+			swarm.aliens[i].rect.Y += float32(alienSpeedY)
+		}
+		alienSpeedX = int(math.Abs(float64(alienSpeedX))) * -1
 	}
 }

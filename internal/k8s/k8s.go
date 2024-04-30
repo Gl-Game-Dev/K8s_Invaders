@@ -39,7 +39,7 @@ func ConnectK8s() (v1.DeploymentInterface, *appsv1.Deployment) {
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "demo-deployment",
+			Name: "k8s-invaders",
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: int32Ptr(2),
@@ -85,7 +85,7 @@ func CreateDeployment(deploymentsClient v1.DeploymentInterface, deployment *apps
 }
 
 func UpdateDeployment(deploymentsClient v1.DeploymentInterface, replica int32) {
-	result, getErr := deploymentsClient.Get(context.TODO(), "demo-deployment", metav1.GetOptions{})
+	result, getErr := deploymentsClient.Get(context.TODO(), "k8s-invaders", metav1.GetOptions{})
 	if getErr != nil {
 		panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
 	}
@@ -99,7 +99,7 @@ func UpdateDeployment(deploymentsClient v1.DeploymentInterface, replica int32) {
 
 func DeleteDeployment(deploymentsClient v1.DeploymentInterface) {
 	deletePolicy := metav1.DeletePropagationForeground
-	if err := deploymentsClient.Delete(context.TODO(), "demo-deployment", metav1.DeleteOptions{
+	if err := deploymentsClient.Delete(context.TODO(), "k8s-invaders", metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	}); err != nil {
 		panic(err)
