@@ -9,3 +9,6 @@ cd K8s_Invaders
 go get
 go run main.go
 ```
+
+
+![gif](images/k8sinvaders.gif)
